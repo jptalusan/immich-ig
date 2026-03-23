@@ -212,6 +212,103 @@ app.get("/api/random", async (req, res) => {
   }
 });
 
+// "On this day" — fetch all images matching today's month/day across all years
+app.get("/api/on-this-day", async (req, res) => {
+  const userIds = req.query.userIds
+    ? req.query.userIds.split(",").filter(Boolean)
+    : null;
+
+  try {
+    const { map: userMap, list: userList } = await getUsers();
+    const targetUsers = userIds || userList.map((u) => u.id);
+
+    const now = new Date();
+    const targetMonth = now.getMonth(); // 0-indexed
+    const targetDay = now.getDate();
+
+    // Get all monthly buckets for each user, find matching months across years
+    const allAssets = [];
+
+    for (const userId of targetUsers) {
+      const bucketsUrl = new URL(`${IMMICH_URL}/api/timeline/buckets`);
+      bucketsUrl.searchParams.set("size", "MONTH");
+      bucketsUrl.searchParams.set("userId", userId);
+
+      const bucketsRes = await fetch(bucketsUrl.toString(), {
+        headers: immichHeaders,
+      });
+      if (!bucketsRes.ok) continue;
+      const buckets = await bucketsRes.json();
+
+      // Filter to buckets matching the current month (any year)
+      const matchingBuckets = buckets.filter((b) => {
+        const d = new Date(b.timeBucket);
+        return d.getMonth() === targetMonth;
+      });
+
+      for (const bucket of matchingBuckets) {
+        const bucketUrl = new URL(`${IMMICH_URL}/api/timeline/bucket`);
+        bucketUrl.searchParams.set("size", "MONTH");
+        bucketUrl.searchParams.set("timeBucket", bucket.timeBucket);
+        bucketUrl.searchParams.set("userId", userId);
+
+        const bucketRes = await fetch(bucketUrl.toString(), {
+          headers: immichHeaders,
+        });
+        if (!bucketRes.ok) continue;
+        const data = await bucketRes.json();
+
+        if (data.id && data.isImage && data.fileCreatedAt) {
+          for (let i = 0; i < data.id.length; i++) {
+            if (!data.isImage[i]) continue;
+            const d = new Date(data.fileCreatedAt[i]);
+            if (d.getMonth() === targetMonth && d.getDate() === targetDay) {
+              allAssets.push({
+                id: data.id[i],
+                fileCreatedAt: data.fileCreatedAt[i],
+                ownerId: data.ownerId[i],
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Fetch full details for all matched assets
+    const assets = await Promise.all(
+      allAssets.map(async (c) => {
+        try {
+          const r = await fetch(`${IMMICH_URL}/api/assets/${c.id}`, {
+            headers: immichHeaders,
+          });
+          if (!r.ok) return null;
+          const asset = await r.json();
+          return {
+            ...asset,
+            ownerName: userMap[asset.ownerId] || null,
+            immichUrl: `${IMMICH_URL}/photos/${c.id}`,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    const images = assets
+      .filter(Boolean)
+      .sort(
+        (a, b) =>
+          new Date(b.fileCreatedAt).getTime() -
+          new Date(a.fileCreatedAt).getTime()
+      );
+
+    res.json(images);
+  } catch (err) {
+    console.error("Failed to fetch on-this-day assets:", err.message);
+    res.status(502).json({ error: "Failed to connect to Immich" });
+  }
+});
+
 // Proxy thumbnail requests
 app.get("/api/assets/:id/thumbnail", async (req, res) => {
   const { id } = req.params;

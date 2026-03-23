@@ -13,7 +13,6 @@ function sortByDate(assets) {
   );
 }
 
-// Sort only the new batch internally, then append to existing list
 function appendSorted(existing, newItems) {
   if (existing.length === 0) return sortByDate(newItems);
   const sortedNew = sortByDate(newItems);
@@ -42,6 +41,7 @@ function App() {
   const [users, setUsers] = useState([]);
   const [enabledUserIds, setEnabledUserIds] = useState(loadEnabledUsers);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [thisDayActive, setThisDayActive] = useState(false);
   const seenIds = useRef(new Set());
   const emptyStreak = useRef(0);
 
@@ -60,7 +60,7 @@ function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchMore = useCallback(async () => {
-    if (loading || !hasMore) return;
+    if (loading || !hasMore || thisDayActive) return;
     setLoading(true);
     setError(null);
     try {
@@ -88,7 +88,7 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [loading, hasMore, enabledUserIds]);
+  }, [loading, hasMore, enabledUserIds, thisDayActive]);
 
   useEffect(() => {
     if (enabledUserIds && enabledUserIds.length > 0) {
@@ -97,12 +97,47 @@ function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resetAndFetch = useCallback(() => {
+    setThisDayActive(false);
     seenIds.current.clear();
     emptyStreak.current = 0;
     setAssets([]);
     setHasMore(true);
     setTimeout(fetchMore, 0);
   }, [fetchMore]);
+
+  const handleThisDay = useCallback(async () => {
+    if (thisDayActive) {
+      // Toggle off — go back to random mode
+      setThisDayActive(false);
+      seenIds.current.clear();
+      emptyStreak.current = 0;
+      setAssets([]);
+      setHasMore(true);
+      return;
+    }
+
+    setThisDayActive(true);
+    setHasMore(false);
+    seenIds.current.clear();
+    setAssets([]);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams();
+      if (enabledUserIds && enabledUserIds.length > 0) {
+        params.set("userIds", enabledUserIds.join(","));
+      }
+      const res = await fetch(`/api/on-this-day?${params}`);
+      if (!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
+      setAssets(sortByDate(data));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [thisDayActive, enabledUserIds]);
 
   const handleToggleUser = (userId) => {
     setEnabledUserIds((prev) => {
@@ -116,8 +151,17 @@ function App() {
 
   const handleApplyFilter = () => {
     setFilterOpen(false);
-    resetAndFetch();
+    if (thisDayActive) {
+      handleThisDay();
+    } else {
+      resetAndFetch();
+    }
   };
+
+  const today = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <div className="app">
@@ -125,6 +169,8 @@ function App() {
         onShuffle={resetAndFetch}
         onFilterClick={() => setFilterOpen(!filterOpen)}
         filterOpen={filterOpen}
+        onThisDay={handleThisDay}
+        thisDayActive={thisDayActive}
       />
       {filterOpen && (
         <UserFilter
@@ -135,6 +181,12 @@ function App() {
         />
       )}
       <main className="main">
+        {thisDayActive && (
+          <div className="this-day-banner">
+            On this day — {today}
+            {assets.length > 0 && <span className="this-day-count">{assets.length} photos</span>}
+          </div>
+        )}
         {error && <div className="error">{error}</div>}
         {enabledUserIds && enabledUserIds.length === 0 && (
           <div className="error">No users selected. Open the filter to enable users.</div>
