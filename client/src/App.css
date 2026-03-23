@@ -1,0 +1,16 @@
+.app {
+  min-height: 100vh;
+}
+
+.main {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 60px 0 20px;
+}
+
+.error {
+  text-align: center;
+  padding: 20px;
+  color: #ed4956;
+  font-size: 14px;
+}

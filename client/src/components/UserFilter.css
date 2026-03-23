@@ -1,0 +1,75 @@
+.user-filter {
+  position: fixed;
+  top: 54px;
+  left: 0;
+  right: 0;
+  background: var(--bg-white);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 99;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.user-filter-inner {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 12px 16px;
+}
+
+.user-filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.user-filter-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.user-filter-apply {
+  background: #262626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.user-filter-apply:hover {
+  background: #404040;
+}
+
+.user-filter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.user-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.user-filter-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #262626;
+  cursor: pointer;
+}
+
+.user-filter-name {
+  font-weight: 500;
+}
+
+.user-filter-email {
+  font-size: 12px;
+  color: var(--text-secondary);
+}

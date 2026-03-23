@@ -1,0 +1,13 @@
+{
+  "name": "immich-ig-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "node index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}

@@ -1,0 +1,9 @@
+services:
+  immich-ig:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - IMMICH_URL=${IMMICH_URL}
+      - IMMICH_API_KEY=${IMMICH_API_KEY}
+    restart: unless-stopped

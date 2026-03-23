@@ -1,0 +1,19 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #fafafa;
+  color: #262626;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root {
+  --max-width: 470px;
+  --border-color: #dbdbdb;
+  --bg-white: #ffffff;
+  --text-secondary: #8e8e8e;
+}
