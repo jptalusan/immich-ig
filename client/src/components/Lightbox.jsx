@@ -15,12 +15,18 @@ function Lightbox({ asset, onClose }) {
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const isPinching = useRef(false);
+  const isPanning = useRef(false);
   const initialPinchDist = useRef(0);
   const initialScale = useRef(1);
   const lastPanX = useRef(0);
   const lastPanY = useRef(0);
   const pinchMidX = useRef(0);
   const pinchMidY = useRef(0);
+  const panStartX = useRef(0);
+  const panStartY = useRef(0);
+
+  // Double-tap detection
+  const lastTapTime = useRef(0);
 
   const resetZoom = useCallback(() => {
     setScale(1);
@@ -47,9 +53,12 @@ function Lightbox({ asset, onClose }) {
   };
 
   const handleTouchStart = (e) => {
+    e.preventDefault();
+
     if (e.touches.length === 2) {
       // Pinch start
       isPinching.current = true;
+      isPanning.current = false;
       setIsDragging(false);
       initialPinchDist.current = getTouchDist(e.touches);
       initialScale.current = scale;
@@ -59,16 +68,40 @@ function Lightbox({ asset, onClose }) {
         (e.touches[0].clientY + e.touches[1].clientY) / 2;
       lastPanX.current = panX;
       lastPanY.current = panY;
-    } else if (e.touches.length === 1 && scale <= 1) {
-      // Single finger swipe (only when not zoomed)
-      startY.current = e.touches[0].clientY;
-      setIsDragging(true);
+    } else if (e.touches.length === 1) {
+      // Double-tap detection
+      const now = Date.now();
+      if (now - lastTapTime.current < 300) {
+        // Double tap
+        if (scale > 1) {
+          resetZoom();
+        } else {
+          setScale(2.5);
+        }
+        lastTapTime.current = 0;
+        return;
+      }
+      lastTapTime.current = now;
+
+      if (scale > 1) {
+        // Single finger pan when zoomed
+        isPanning.current = true;
+        panStartX.current = e.touches[0].clientX;
+        panStartY.current = e.touches[0].clientY;
+        lastPanX.current = panX;
+        lastPanY.current = panY;
+      } else {
+        // Swipe to dismiss when not zoomed
+        startY.current = e.touches[0].clientY;
+        setIsDragging(true);
+      }
     }
   };
 
   const handleTouchMove = (e) => {
+    e.preventDefault();
+
     if (e.touches.length === 2 && isPinching.current) {
-      e.preventDefault();
       const dist = getTouchDist(e.touches);
       const newScale = Math.max(
         1,
@@ -76,11 +109,16 @@ function Lightbox({ asset, onClose }) {
       );
       setScale(newScale);
 
-      // Pan with pinch midpoint
       const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
       setPanX(lastPanX.current + midX - pinchMidX.current);
       setPanY(lastPanY.current + midY - pinchMidY.current);
+    } else if (e.touches.length === 1 && isPanning.current && scale > 1) {
+      // Single finger pan when zoomed
+      const dx = e.touches[0].clientX - panStartX.current;
+      const dy = e.touches[0].clientY - panStartY.current;
+      setPanX(lastPanX.current + dx);
+      setPanY(lastPanY.current + dy);
     } else if (e.touches.length === 1 && isDragging && scale <= 1) {
       const diff = e.touches[0].clientY - startY.current;
       if (diff > 0) {
@@ -92,10 +130,14 @@ function Lightbox({ asset, onClose }) {
   const handleTouchEnd = (e) => {
     if (isPinching.current && e.touches.length < 2) {
       isPinching.current = false;
-      // Snap back to 1x if close
       if (scale < 1.1) {
         resetZoom();
       }
+      return;
+    }
+
+    if (isPanning.current) {
+      isPanning.current = false;
       return;
     }
 
@@ -119,7 +161,7 @@ function Lightbox({ asset, onClose }) {
   return (
     <div
       className="lightbox-overlay"
-      onClick={scale > 1 ? resetZoom : onClose}
+      onClick={onClose}
       style={{ background: `rgba(0, 0, 0, ${opacity * 0.9})` }}
     >
       <button className="lightbox-close" onClick={onClose}>
@@ -133,9 +175,10 @@ function Lightbox({ asset, onClose }) {
         onTouchEnd={handleTouchEnd}
         style={{
           transform: contentTransform,
-          transition: isDragging || isPinching.current
-            ? "none"
-            : "transform 0.25s ease",
+          transition:
+            isDragging || isPinching.current || isPanning.current
+              ? "none"
+              : "transform 0.25s ease",
         }}
       >
         {!loaded && (
@@ -148,6 +191,7 @@ function Lightbox({ asset, onClose }) {
           src={originalUrl}
           alt={asset.originalFileName || "Photo"}
           onLoad={() => setLoaded(true)}
+          draggable={false}
         />
       </div>
     </div>
