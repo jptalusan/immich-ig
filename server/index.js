@@ -226,8 +226,11 @@ app.get("/api/on-this-day", async (req, res) => {
     const targetMonth = now.getMonth(); // 0-indexed
     const targetDay = now.getDate();
 
-    // Get all monthly buckets for each user, find matching months across years
-    const allAssets = [];
+    const SAMPLES_PER_YEAR = 3;
+
+    // Get matching assets grouped by year, then sample per year
+    // { year -> [{ id, fileCreatedAt, ownerId }] }
+    const byYear = {};
 
     for (const userId of targetUsers) {
       const bucketsUrl = new URL(`${IMMICH_URL}/api/timeline/buckets`);
@@ -263,7 +266,9 @@ app.get("/api/on-this-day", async (req, res) => {
             if (!data.isImage[i]) continue;
             const d = new Date(data.fileCreatedAt[i]);
             if (d.getMonth() === targetMonth && d.getDate() === targetDay) {
-              allAssets.push({
+              const year = d.getFullYear();
+              if (!byYear[year]) byYear[year] = [];
+              byYear[year].push({
                 id: data.id[i],
                 fileCreatedAt: data.fileCreatedAt[i],
                 ownerId: data.ownerId[i],
@@ -274,9 +279,17 @@ app.get("/api/on-this-day", async (req, res) => {
       }
     }
 
-    // Fetch full details for all matched assets
+    // Sample up to SAMPLES_PER_YEAR from each year
+    const sampled = [];
+    for (const year of Object.keys(byYear)) {
+      const yearAssets = byYear[year];
+      const shuffled = yearAssets.sort(() => Math.random() - 0.5);
+      sampled.push(...shuffled.slice(0, SAMPLES_PER_YEAR));
+    }
+
+    // Fetch full details for sampled assets
     const assets = await Promise.all(
-      allAssets.map(async (c) => {
+      sampled.map(async (c) => {
         try {
           const r = await fetch(`${IMMICH_URL}/api/assets/${c.id}`, {
             headers: immichHeaders,
