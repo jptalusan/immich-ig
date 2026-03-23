@@ -13,6 +13,13 @@ function sortByDate(assets) {
   );
 }
 
+// Sort only the new batch internally, then append to existing list
+function appendSorted(existing, newItems) {
+  if (existing.length === 0) return sortByDate(newItems);
+  const sortedNew = sortByDate(newItems);
+  return [...existing, ...sortedNew];
+}
+
 function loadEnabledUsers() {
   try {
     const saved = localStorage.getItem("immich-ig-enabled-users");
@@ -74,7 +81,7 @@ function App() {
         }
       } else {
         emptyStreak.current = 0;
-        setAssets((prev) => sortByDate([...prev, ...newAssets]));
+        setAssets((prev) => appendSorted(prev, newAssets));
       }
     } catch (err) {
       setError(err.message);
